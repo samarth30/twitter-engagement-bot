@@ -174,6 +174,7 @@ const respondToDirectMentions = async (mentions) => {
       }
     } catch (error) {
       console.log(error);
+      continue;
     }
 
     // delay for 2 seconds
