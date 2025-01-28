@@ -76,9 +76,22 @@ const fetchMentions = async (lastMentionTweetId = null) => {
   }
 };
 
-// Initialize bot function
+// Add a flag to track if initialization is in progress
+let isInitializationInProgress = false;
+
+// Add at the top with other constants
+let lastSuccessfulRun = null;
+
+// Modify the initializeBot function
 const initializeBot = async () => {
+  // If already running, skip this execution
+  if (isInitializationInProgress) {
+    console.log("Previous batch still processing, skipping this run");
+    return;
+  }
+
   try {
+    isInitializationInProgress = true;
     const botState = await getBotState();
     console.log("Running bot initialization at:", new Date().toISOString());
 
@@ -96,15 +109,24 @@ const initializeBot = async () => {
       lastProcessed: Date.now(),
       lastMentionTweetId: existingMentions?._realData?.meta?.newest_id,
     });
+
+    // Add in initializeBot before the finally block
+    lastSuccessfulRun = Date.now();
+    console.log(`Batch completed. Time since last successful run: ${
+      lastSuccessfulRun 
+        ? Math.floor((Date.now() - lastSuccessfulRun) / 1000) 
+        : 'N/A'
+    } seconds`);
   } catch (error) {
     console.error("Error initializing bot:", error);
     await delay(60000); // 1 minute delay before retry
-    initializeBot();
+  } finally {
+    isInitializationInProgress = false;
   }
 };
 
-// Set up cron job to run every 10 minutes
-cron.schedule("*/2 * * * *", async () => {
+// Update cron schedule to run every 15 seconds
+cron.schedule("*/15 * * * * *", async () => {
   console.log("Running scheduled bot check");
   await initializeBot();
 });

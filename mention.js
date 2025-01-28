@@ -152,7 +152,7 @@ const respondToDirectMentions = async (mentions) => {
 
   const validTweetIds = [];
   const mentionedConversationTweets = [];
-  const batchSize = 10;
+  const batchSize = 50;
 
   // Process mentions in batches
   for (let i = 0; i < mentions.length; i += batchSize) {
