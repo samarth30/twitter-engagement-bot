@@ -138,7 +138,7 @@ const generateResponse = async (text) => {
       response.data[response.data?.length - 1].text,
     image:
       response.data?.length > 0 &&
-      response.data[response.data?.length - 1].attachments?.[0]?.url,
+      response.data[response.data?.length - 1]?.attachments?.[0]?.url,
   };
 };
 
