@@ -52,23 +52,47 @@ const checkAlreadyResponded = async (mentionedConversationTweetId) => {
 };
 
 // Modify respondToTweet to use MongoDB
-const respondToTweet = async (tweetId, message, retryCount = 0) => {
+const respondToTweet = async (tweetId, message, imageUrl, retryCount = 0) => {
   try {
     if (await checkAlreadyResponded(tweetId)) return;
 
-    const response = await v2Client.reply(message, tweetId);
+    let mediaId = null;
+    if (imageUrl) {
+      try {
+        // Download the image from the URL into a buffer
+        const response = await axios.get(imageUrl, {
+          responseType: "arraybuffer",
+        });
+        const imageBuffer = Buffer.from(response.data, "binary");
+
+        // Upload the image buffer to Twitter and get the media ID
+        const mediaResponse = await v1Client.uploadMedia(imageBuffer, {
+          mimeType: "image/png",
+        });
+        mediaId = mediaResponse?.toString();
+      } catch (uploadError) {
+        console.error("Error uploading media:", uploadError);
+      }
+    }
+
+    // Include the media ID in the reply if available
+    const response = await v2Client.reply(message, tweetId, {
+      media: mediaId ? { media_ids: [mediaId] } : undefined,
+    });
 
     if (response.data.id) {
       await addRespondedTweet(tweetId);
+      console.log(`Reply sent successfully. Tweet ID: ${response.data.id}`);
     }
   } catch (error) {
     if (error.code === 429 && retryCount < MAX_RETRIES) {
       const backoffDelay = getBackoffDelay(retryCount);
       console.log(`Rate limit hit. Backing off for ${backoffDelay / 1000}s`);
       await delay(backoffDelay);
-      return respondToTweet(tweetId, message, retryCount + 1);
+      return respondToTweet(tweetId, message, imageUrl, retryCount + 1);
     }
     error.isRateLimit = error.code === 429;
+    console.error("Error sending reply:", error);
     throw error;
   }
 };
@@ -108,9 +132,14 @@ const generateResponse = async (text) => {
   );
 
   console.log(response.data);
-  return (
-    response.data?.length > 0 && response.data[response.data?.length - 1].text
-  );
+  return {
+    text:
+      response.data?.length > 0 &&
+      response.data[response.data?.length - 1].text,
+    image:
+      response.data?.length > 0 &&
+      response.data[response.data?.length - 1].attachments?.[0]?.url,
+  };
 };
 
 // Modify respondToDirectMentions to use MongoDB
@@ -149,7 +178,8 @@ const respondToDirectMentions = async (mentions) => {
           console.log("--------------------------------");
           console.log(response);
           console.log("--------------------------------");
-          await respondToTweet(id, response);
+
+          await respondToTweet(id, response?.text, response?.image);
           await updateBotState({
             lastProcessed: Date.now(),
             lastMentionTweetId: id,
@@ -173,7 +203,7 @@ const respondToDirectMentions = async (mentions) => {
             console.log("--------------------------------");
             console.log(response);
             console.log("--------------------------------");
-            await respondToTweet(id, response);
+            await respondToTweet(id, response?.text, response?.image);
             await updateBotState({
               lastProcessed: Date.now(),
               lastMentionTweetId: id,
