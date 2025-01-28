@@ -121,64 +121,75 @@ const respondToDirectMentions = async (mentions) => {
 
   const validTweetIds = [];
   const mentionedConversationTweets = [];
+  const batchSize = 5;
 
-  for (const tweet of mentions) {
-    const { text, entities, id, conversation_id, author_id } = tweet;
+  // Process mentions in batches
+  for (let i = 0; i < mentions.length; i += batchSize) {
+    const currentBatch = mentions.slice(i, i + batchSize);
 
-    if (author_id === userData.id) {
-      continue;
-    }
+    // Process batch simultaneously
+    await Promise.all(
+      currentBatch.map(async (tweet) => {
+        const { text, entities, id, conversation_id, author_id } = tweet;
 
-    const museMention = entities.mentions.find(
-      (mention) => mention.username === "MuseOfTruth"
+        if (author_id === userData.id) {
+          return;
+        }
+
+        const museMention = entities.mentions.find(
+          (mention) => mention.username === "MuseOfTruth"
+        );
+
+        if (conversation_id === tweet.id) {
+          console.log("conversation_id");
+          console.log(conversation_id);
+          validTweetIds.push(id);
+          const response = await generateResponse(text);
+          console.log(text);
+          console.log("--------------------------------");
+          console.log(response);
+          console.log("--------------------------------");
+          await respondToTweet(id, response);
+          await updateBotState({
+            lastProcessed: Date.now(),
+            lastMentionTweetId: id,
+          });
+          return;
+        }
+
+        try {
+          const mentionedConversationTweet =
+            await getMentionConversationTweet(tweet);
+          mentionedConversationTweets.push(mentionedConversationTweet);
+
+          if (mentionedConversationTweet) {
+            console.log("mentionedConversationTweet");
+            console.log(mentionedConversationTweet);
+
+            const combinedText =
+              mentionedConversationTweet?.data?.text + " " + text;
+            const response = await generateResponse(combinedText);
+            console.log(combinedText);
+            console.log("--------------------------------");
+            console.log(response);
+            console.log("--------------------------------");
+            await respondToTweet(id, response);
+            await updateBotState({
+              lastProcessed: Date.now(),
+              lastMentionTweetId: id,
+            });
+          }
+        } catch (error) {
+          console.log(error);
+          return;
+        }
+      })
     );
 
-    if (conversation_id === tweet.id) {
-      console.log("conversation_id");
-      console.log(conversation_id);
-      validTweetIds.push(id);
-      const response = await generateResponse(text);
-      console.log(text);
-      console.log("--------------------------------");
-      console.log(response);
-      console.log("--------------------------------");
-      await respondToTweet(id, response);
-      await updateBotState({
-        lastProcessed: Date.now(),
-        lastMentionTweetId: id,
-      });
-      continue;
+    // Add a small delay between batches to avoid rate limits
+    if (i + batchSize < mentions.length) {
+      await new Promise((resolve) => setTimeout(resolve, 5000));
     }
-
-    try {
-      const mentionedConversationTweet =
-        await getMentionConversationTweet(tweet);
-      mentionedConversationTweets.push(mentionedConversationTweet);
-
-      if (mentionedConversationTweet) {
-        console.log("mentionedConversationTweet");
-        console.log(mentionedConversationTweet);
-
-        const combinedText =
-          mentionedConversationTweet?.data?.text + " " + text;
-        const response = await generateResponse(combinedText);
-        console.log(combinedText);
-        console.log("--------------------------------");
-        console.log(response);
-        console.log("--------------------------------");
-        await respondToTweet(id, response);
-        await updateBotState({
-          lastProcessed: Date.now(),
-          lastMentionTweetId: id,
-        });
-      }
-    } catch (error) {
-      console.log(error);
-      continue;
-    }
-
-    // delay for 2 seconds
-    await new Promise((resolve) => setTimeout(resolve, 5000));
   }
 
   return validTweetIds;
