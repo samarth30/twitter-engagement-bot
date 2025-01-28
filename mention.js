@@ -56,29 +56,31 @@ const respondToTweet = async (tweetId, message, imageUrl, retryCount = 0) => {
   try {
     if (await checkAlreadyResponded(tweetId)) return;
 
-    let mediaId = null;
-    if (imageUrl) {
-      try {
-        // Download the image from the URL into a buffer
-        const response = await axios.get(imageUrl, {
-          responseType: "arraybuffer",
-        });
-        const imageBuffer = Buffer.from(response.data, "binary");
+    // let mediaId = null;
+    // if (imageUrl) {
+    //   try {
+    //     // Download the image from the URL into a buffer
+    //     const response = await axios.get(imageUrl, {
+    //       responseType: "arraybuffer",
+    //     });
+    //     const imageBuffer = Buffer.from(response.data, "binary");
 
-        // Upload the image buffer to Twitter and get the media ID
-        const mediaResponse = await v1Client.uploadMedia(imageBuffer, {
-          mimeType: "image/png",
-        });
-        mediaId = mediaResponse?.toString();
-      } catch (uploadError) {
-        console.error("Error uploading media:", uploadError);
-      }
-    }
+    //     // Upload the image buffer to Twitter and get the media ID
+    //     const mediaResponse = await v1Client.uploadMedia(imageBuffer, {
+    //       mimeType: "image/png",
+    //     });
+    //     mediaId = mediaResponse?.toString();
+    //   } catch (uploadError) {
+    //     console.error("Error uploading media:", uploadError);
+    //   }
+    // }
 
     // Include the media ID in the reply if available
-    const response = await v2Client.reply(message, tweetId, {
-      media: mediaId ? { media_ids: [mediaId] } : undefined,
-    });
+    // const response = await v2Client.reply(message, tweetId, {
+    //   media: mediaId ? { media_ids: [mediaId] } : undefined,
+    // });
+
+    const response = await v2Client.reply(message, tweetId);
 
     if (response.data.id) {
       await addRespondedTweet(tweetId);
@@ -150,7 +152,7 @@ const respondToDirectMentions = async (mentions) => {
 
   const validTweetIds = [];
   const mentionedConversationTweets = [];
-  const batchSize = 5;
+  const batchSize = 10;
 
   // Process mentions in batches
   for (let i = 0; i < mentions.length; i += batchSize) {

@@ -104,7 +104,7 @@ const initializeBot = async () => {
 };
 
 // Set up cron job to run every 10 minutes
-cron.schedule("*/3 * * * *", async () => {
+cron.schedule("*/2 * * * *", async () => {
   console.log("Running scheduled bot check");
   await initializeBot();
 });
